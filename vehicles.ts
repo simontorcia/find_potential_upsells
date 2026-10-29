@@ -6,3 +6,8 @@ import type {
 export function getOwnedVehicles(_personIds: string[]): OwnedVehicle[] {
   return [];
 }
+
+// Asynchronous datasource stub for the improvements version.
+export async function getOwnedVehiclesAsync(_personIds: string[]): Promise<OwnedVehicle[]> {
+  return [];
+}
