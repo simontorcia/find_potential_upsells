@@ -1,0 +1,17 @@
+{
+  "name": "pair-session",
+  "private": true,
+  "scripts": {
+    "start": "tsx solution.ts",
+    "test": "jest",
+    "test:watch": "jest --watchAll"
+  },
+  "devDependencies": {
+    "@types/jest": "30.0.0",
+    "@types/node": "24.19.2",
+    "jest": "30.5.2",
+    "ts-jest": "29.4.15",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}
