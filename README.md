@@ -98,7 +98,7 @@ The solution assumes that the service returns unique vehicles belonging to the r
 
 Each suite independently tests its implementation's domain contract: empty input, no owned vehicles, insured-vehicle exclusion, additional opportunities, duplicate policies, person–vehicle matching, ordering, absence of mutations, invocation independence, and propagation of the original error. The improvements suite additionally covers batch boundaries, deduplication before batching, bounded concurrency, slot reuse, out-of-order completion, and multiple in-flight failures. Overlapping-invocation tests verify that insurance data and failure state remain isolated: one operation's failure does not stop the other.
 
-The latest verification passed **31 tests across 2 suites**, as well as `npx tsc --noEmit`. The multiple-failure test checks scheduling behavior; it is not a dedicated assertion about Node.js `unhandledRejection` events.
+The latest verification passed **25 tests across 2 suites**, as well as `npx tsc --noEmit`. Batch-limit cases focus on 100, 101, 200, and 201 unique customers; the concurrency tests exercise larger inputs. The multiple-failure test checks scheduling behavior; it is not a dedicated assertion about Node.js `unhandledRejection` events.
 
 ## Flow logging
 

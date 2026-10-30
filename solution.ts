@@ -1,5 +1,6 @@
 import { getOwnedVehicles, getOwnedVehiclesAsync } from './vehicles';
 
+// API payload limit; independent of how many requests may run concurrently.
 const MAX_PERSON_IDS_PER_CALL = 100;
 // Per-invocation concurrency; confirm this value with the API provider.
 const MAX_CONCURRENT_CALLS = 3;
@@ -31,6 +32,8 @@ export type OwnedVehicle = { person_id: string; vehicle_id: string };
 export type Policy = { person_id: string; vehicle_id: string };
 export type UpsellOpportunity = { person_id: string; vehicle_id: string };
 
+// Index each person–vehicle pair once for average O(1) insurance checks.
+// Map keys also provide the unique customers to query.
 function indexInsuredVehicles(policies: Policy[]): Map<string, Set<string>> {
   const insuredByPerson = new Map<string, Set<string>>();
   for (const policy of policies) {
@@ -48,14 +51,14 @@ function findUninsuredVehicles(
   ownedVehicles: OwnedVehicle[],
   insuredByPerson: Map<string, Set<string>>
 ): UpsellOpportunity[] {
+  // Assume the datasource returns only requested owners; preserve response order.
   return ownedVehicles.filter((vehicle) =>
     !insuredByPerson.get(vehicle.person_id)?.has(vehicle.vehicle_id)
   );
 }
 
-// This is the function you have to implement.
-// It should return a list of up-selling targets, where each target is
-// another vehicle owned by a customer.
+// Baseline: one synchronous lookup, then exclude already insured pairs.
+// Retained for comparison; it does not enforce the external API payload limit.
 export function findPotentialUpsells(policies: Policy[]): UpsellOpportunity[] {
   console.debug('[upsell:baseline] start', { policies: policies.length });
   if (policies.length === 0) {
@@ -75,7 +78,8 @@ export function findPotentialUpsells(policies: Policy[]): UpsellOpportunity[] {
   return opportunities;
 }
 
-// Improvements: at most 100 IDs per call, with bounded asynchronous concurrency.
+// Improvements: minimize costly calls with full batches and overlap their latency
+// with a bounded pool. Reject the whole operation if any worker fails.
 export async function findPotentialUpsellsOptimized(policies: Policy[]): Promise<UpsellOpportunity[]> {
   console.debug('[upsell:pool] start', { policies: policies.length });
   if (policies.length === 0) {
@@ -86,7 +90,9 @@ export async function findPotentialUpsellsOptimized(policies: Policy[]): Promise
   const insuredByPerson = indexInsuredVehicles(policies);
 
   const personIds = [...insuredByPerson.keys()];
+  // Deduplicate before batching: C unique customers require ceil(C / 100) calls.
   const batchCount = Math.ceil(personIds.length / MAX_PERSON_IDS_PER_CALL);
+  // Store filtered results by batch index, not completion order.
   const opportunitiesByBatch: UpsellOpportunity[][] = new Array(batchCount);
   let nextBatchIndex = 0;
   let failed = false;
@@ -98,7 +104,7 @@ export async function findPotentialUpsellsOptimized(policies: Policy[]): Promise
 
   const worker = async (): Promise<void> => {
     while (!failed && nextBatchIndex < batchCount) {
-      // Claim the batch before awaiting so workers cannot claim it twice.
+      // No await between checking and claiming: workers cannot claim the same batch.
       const batchIndex = nextBatchIndex++;
       const offset = batchIndex * MAX_PERSON_IDS_PER_CALL;
       const batch = personIds.slice(offset, offset + MAX_PERSON_IDS_PER_CALL);
@@ -120,13 +126,17 @@ export async function findPotentialUpsellsOptimized(policies: Policy[]): Promise
         console.debug('[upsell:pool] batch failed; stopping new batches', { batchIndex });
         throw error;
       }
+      // Reuse the free slot immediately without waiting for the other workers.
     }
   };
 
+  // One outstanding request per worker. Promise.all propagates the first worker
+  // rejection and handles later ones too; it does not cancel in-flight requests.
   await Promise.all(
     Array.from({ length: Math.min(MAX_CONCURRENT_CALLS, batchCount) }, () => worker())
   );
 
+  // Reassemble in request-batch order, preserving datasource order within each batch.
   const opportunities = opportunitiesByBatch.flat();
   console.debug('[upsell:pool] complete', { opportunities: opportunities.length });
   return opportunities;

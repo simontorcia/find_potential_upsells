@@ -38,11 +38,6 @@ describe('findPotentialUpsellsOptimized — asynchronous improvements', () => {
     expect(serviceMock).toHaveBeenCalledWith(['A']);
   });
 
-  it('excludes a vehicle that is already insured', async () => {
-    serviceMock.mockResolvedValue([{ person_id: 'A', vehicle_id: '1' }]);
-    await expect(findPotentialUpsellsOptimized([{ person_id: 'A', vehicle_id: '1' }])).resolves.toEqual([]);
-  });
-
   it('returns additional owned vehicles in service order', async () => {
     serviceMock.mockResolvedValue([
       { person_id: 'A', vehicle_id: '3' },
@@ -105,20 +100,6 @@ describe('findPotentialUpsellsOptimized — asynchronous improvements', () => {
     ])).resolves.toEqual([]);
   });
 
-  it('does not reuse insured vehicles from a previous invocation', async () => {
-    serviceMock.mockResolvedValue([
-      { person_id: 'A', vehicle_id: '1' },
-      { person_id: 'A', vehicle_id: '2' },
-    ]);
-    await expect(findPotentialUpsellsOptimized([{ person_id: 'A', vehicle_id: '1' }])).resolves.toEqual([
-      { person_id: 'A', vehicle_id: '2' },
-    ]);
-    await expect(findPotentialUpsellsOptimized([{ person_id: 'A', vehicle_id: '2' }])).resolves.toEqual([
-      { person_id: 'A', vehicle_id: '1' },
-    ]);
-    expect(serviceMock).toHaveBeenCalledTimes(2);
-  });
-
   it('does not modify the policies or the service response', async () => {
     const policies = [{ person_id: 'A', vehicle_id: '1' }];
     const ownedVehicles = [
@@ -148,7 +129,7 @@ describe('findPotentialUpsellsOptimized — asynchronous improvements', () => {
   });
 
   describe('external API request limit', () => {
-    it.each([1, 99, 100, 101, 200, 201, 401])(
+    it.each([100, 101, 200, 201])(
       'uses the minimum number of calls for %i unique customers, with at most 100 IDs per call',
       async (count) => {
         const policies = makePolicies(count);

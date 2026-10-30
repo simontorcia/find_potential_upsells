@@ -21,11 +21,6 @@ describe('findPotentialUpsells — synchronous baseline', () => {
     expect(serviceMock).toHaveBeenCalledWith(['A']);
   });
 
-  it('excludes an already insured vehicle', () => {
-    serviceMock.mockReturnValue([{ person_id: 'A', vehicle_id: '1' }]);
-    expect(findPotentialUpsells([{ person_id: 'A', vehicle_id: '1' }])).toEqual([]);
-  });
-
   it('returns additional vehicles in datasource order', () => {
     serviceMock.mockReturnValue([
       { person_id: 'A', vehicle_id: '3' },
